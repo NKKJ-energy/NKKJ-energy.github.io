@@ -256,7 +256,7 @@ button { cursor: pointer; }
 .standard-item { overflow: hidden; border-radius: 20px; background: #fff; box-shadow: 0 8px 28px rgba(0,0,0,.055); animation: section-in .45s both; animation-delay: var(--delay); }
 .standard-item.is-landscape { display: block; }
 .standard-item.is-portrait { display: grid; grid-template-columns: minmax(0,1.08fr) minmax(170px,.92fr); align-items: stretch; }
-.standard-image { width: 100%; display: block; overflow: hidden; padding: 0; border: 0; background: #e8ece9; }
+.standard-image { width: 100%; aspect-ratio: 4 / 3; display: block; overflow: hidden; padding: 0; border: 0; background: #e8ece9; }
 .standard-item.is-landscape .standard-image { aspect-ratio: 4 / 3; }
 .standard-item.is-portrait .standard-image { aspect-ratio: 3 / 4; }
 .standard-image img { width: 100%; height: 100%; display: block; object-fit: contain; transition: transform .55s cubic-bezier(.2,.8,.2,1); }
@@ -412,13 +412,7 @@ dialog form, dialog article { padding: 30px; }
   .visual-standard-section > header h3 { font-size: 23px; }
   .visual-standard-section > header p { font-size: 13px; line-height: 1.6; }
   .standard-gallery { grid-template-columns: 1fr; }
-  .standard-item {
-    content-visibility: auto;
-    contain-intrinsic-size: 420px;
-    border-radius: 15px;
-    box-shadow: 0 5px 20px rgba(0,0,0,.055);
-    animation: none;
-  }
+  .standard-item { border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,.055); animation: none; }
   .standard-item.is-landscape, .standard-item.is-portrait { grid-column: auto; display: block; }
   .standard-item.is-landscape > div, .standard-item.is-portrait > div { display: block; min-height: 0; padding: 15px 16px 18px; border: 0; }
   .standard-item h4 { margin: 5px 0 6px; font-size: 17px; }
