@@ -134,11 +134,11 @@
   function navigate(m) {
     if(m==="settings"&&!isAdmin()) return;
     currentModule=m; $$(".nav-item").forEach((b)=>b.classList.toggle("active",b.dataset.module===m));
-    const staticPage=standardModules.includes(m);
+    const staticPage=standardModules.includes(m),simplePage=m==="dashboard"||m==="settings";
     $("#pageTitle").textContent=modules[m][0];
-    $$(".content-filter").forEach(el=>el.classList.toggle("hidden",staticPage||m==="settings"));
-    $("#archiveFilter").classList.toggle("hidden",!isAdmin()||m==="settings");
-    $("#editToggle").classList.toggle("hidden",!isAdmin()||m==="settings");
+    $$(".content-filter").forEach(el=>el.classList.toggle("hidden",staticPage||simplePage));
+    $("#archiveFilter").classList.toggle("hidden",!isAdmin()||simplePage);
+    $("#editToggle").classList.toggle("hidden",!isAdmin()||simplePage);
     $("#addBtn").classList.toggle("hidden",!isAdmin()||!editableModules.includes(m));
     closeNav(); updateCategories();
     if(staticPage&&unresolvedStorageImagePaths(items).length){
@@ -213,7 +213,7 @@
     })).filter(section=>section.items.length):staticSections;
     const label=module==="presentation"?"SERVICE STANDARD":"CLEAN & READY";
     $("#contentArea").innerHTML=`<div class="section-head standards-heading"><div><span class="section-kicker">${label}</span><h3>${modules[module][0]}</h3><p>${modules[module][1]}</p></div></div>`+
-      sections.map((section,index)=>`<section class="visual-standard-section"><header><div><span>${String(index+1).padStart(2,"0")}</span><h3>${escapeHtml(section.title)}</h3></div><p>${escapeHtml(section.description)}</p></header><div class="standard-gallery">${section.items.map((item,itemIndex)=>`<article class="standard-item" style="--delay:${itemIndex*35}ms"><button class="standard-image" type="button" data-image="${escapeHtml(item.image)}" aria-label="查看${escapeHtml(item.title)}大图">${standardThumbnail(item)}</button><div><span>STANDARD ${String(itemIndex+1).padStart(2,"0")}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.text)}</p>${item.record&&isAdmin()&&editMode?adminActions(item.record,false):""}</div></article>`).join("")}</div></section>`).join("");
+      sections.map((section,index)=>`<section class="visual-standard-section"><header><div><span>${String(index+1).padStart(2,"0")}</span><h3>${escapeHtml(section.title)}</h3></div><p>${escapeHtml(section.description)}</p></header><div class="standard-gallery">${section.items.map((item,itemIndex)=>`<article class="standard-item" style="--delay:${itemIndex*35}ms"><button class="standard-image" type="button" data-image="${escapeHtml(item.image)}" aria-label="查看${escapeHtml(item.title)}大图">${standardThumbnail(item,index===0&&itemIndex===0)}</button><div><span>STANDARD ${String(itemIndex+1).padStart(2,"0")}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.text)}</p>${item.record&&isAdmin()&&editMode?adminActions(item.record,false):""}</div></article>`).join("")}</div></section>`).join("");
     $$(".standard-image img",$("#contentArea")).forEach((image)=>{if(image.complete)classifyStandardImage(image);});
   }
   function standardModuleOf(item){return item.metadata&&item.metadata.standard_module;}
@@ -250,10 +250,10 @@
     if(!path||path.startsWith("assets/")||/^(?:https?:|data:|blob:)/i.test(path)||!/\.(?:jpe?g)$/i.test(path))return path;
     return `assets/${variant}/${path}`;
   }
-  function standardThumbnail(item) {
+  function standardThumbnail(item,priority) {
     const original=encodeURI(item.image),full=encodeURI(standardImageAsset(item.image,"images")),thumbnail=encodeURI(standardImageAsset(item.image,"thumbnails"));
     const originalFallback=storagePathOf(item.image)?"":` data-original-src="${escapeHtml(original)}"`;
-    return `<img src="${escapeHtml(thumbnail)}" data-fallback-src="${escapeHtml(full)}"${originalFallback} alt="${escapeHtml(item.title)}" loading="lazy" decoding="async">`;
+    return `<img src="${escapeHtml(thumbnail)}" data-fallback-src="${escapeHtml(full)}"${originalFallback} alt="${escapeHtml(item.title)}" loading="${priority?"eager":"lazy"}" fetchpriority="${priority?"high":"low"}" decoding="async">`;
   }
   function useFallbackImage(image) {
     const fallback=image.dataset.fallbackSrc||image.dataset.originalSrc;
@@ -298,7 +298,7 @@
   function cardAction(e) {
     const chapterLink=e.target.closest(".handbook-toc a");
     if(chapterLink){e.preventDefault();const chapter=$(chapterLink.getAttribute("href"));if(chapter){chapter.scrollIntoView({behavior:"smooth",block:"start"});history.replaceState(null,"",chapterLink.getAttribute("href"));}return}
-    const image=e.target.closest("[data-image]"); if(image){showImage(image.dataset.image,image.querySelector("img").alt);return}
+    const image=e.target.closest("[data-image]"); if(image){const previewImage=image.querySelector("img");showImage(image.dataset.image,previewImage.alt,previewImage.currentSrc||previewImage.src);return}
     const b=e.target.closest("[data-action]"); if(!b)return;
     if(b.dataset.action==="add-category") return openEditor({module:"recipes",category:b.dataset.category});
     const x=items.find(i=>String(i.id)===b.dataset.id); if(!x)return;
@@ -436,7 +436,7 @@
       $("#saveBtn").disabled=false;$("#saveBtn").textContent="保存内容";
     }
   }
-  function showImage(src,title){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";const fallback=storagePathOf(src)?"":` data-fallback-src="${escapeHtml(encodeURI(src))}"`;$("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(encodeURI(standardImageAsset(src,"images")))}"${fallback} alt="${escapeHtml(title)}" decoding="async">`;const image=$("#detailContent img");image.addEventListener("error",()=>useFallbackImage(image));$("#detailDialog").showModal();}
+  function showImage(src,title,previewSrc=""){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";const full=encodeURI(standardImageAsset(src,"images")),mobilePreview=matchMedia("(max-width: 820px)").matches&&previewSrc?previewSrc:"",source=mobilePreview||full,fallback=source!==full?` data-fallback-src="${escapeHtml(full)}"`:storagePathOf(src)?"":` data-fallback-src="${escapeHtml(encodeURI(src))}"`;$("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(source)}"${fallback} alt="${escapeHtml(title)}" decoding="async">`;const image=$("#detailContent img");image.addEventListener("error",()=>useFallbackImage(image));$("#detailDialog").showModal();}
   async function mutateUpdate(x,patch,label){const {error}=await client.from("content_items").update({...patch,updated_at:new Date().toISOString()}).eq("id",x.id);if(error)return toast("操作失败："+error.message);await log("update",`${label}：${x.title}`);toast("操作成功");await loadItems();}
   async function mutateDelete(x){
     const {error}=await client.from("content_items").delete().eq("id",x.id);

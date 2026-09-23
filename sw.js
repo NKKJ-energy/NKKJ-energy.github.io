@@ -1,4 +1,4 @@
-const CACHE_NAME = "energy-coffee-shell-20260923-4";
+const CACHE_NAME = "energy-coffee-shell-20260923-5";
 const APP_SHELL = [
   "./index.html",
   "./styles.css",
