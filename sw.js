@@ -1,11 +1,12 @@
-const CACHE_NAME = "energy-coffee-shell-20260923-7";
+const CACHE_NAME = "energy-coffee-shell-20260923-9";
 const APP_SHELL = [
   "./index.html",
-  "./styles.css?v=7",
-  "./vendor/supabase-2.117.1.min.js?v=7",
-  "./config.js?v=7",
-  "./standards-data.js?v=7",
-  "./app.js?v=7",
+  "./styles.css?v=9",
+  "./vendor/supabase-2.117.1.min.js?v=9",
+  "./config.js?v=9",
+  "./standards-data.js?v=9",
+  "./image-assets.js?v=9",
+  "./app.js?v=9",
 ];
 
 self.addEventListener("install", (event) => {

@@ -1,0 +1,23 @@
+window.STANDARD_IMAGE_ASSETS = {
+  "出品标准/23442843b7b795a8c4911543b0d73978.jpg": { thumbnail: "assets/thumbs/p01.jpg", full: "assets/full/p01.jpg" },
+  "出品标准/306da21340d44788f22749b3740392a7.jpg": { thumbnail: "assets/thumbs/p02.jpg", full: "assets/full/p02.jpg" },
+  "出品标准/67bde0cb6433d8ce225f857abf871e19.jpg": { thumbnail: "assets/thumbs/p03.jpg", full: "assets/full/p03.jpg" },
+  "出品标准/6dea1c22c13f349dc046c0d287c389eb.jpg": { thumbnail: "assets/thumbs/p04.jpg", full: "assets/full/p04.jpg" },
+  "出品标准/74ff71a303365cf79dc897933b8a38d7.jpg": { thumbnail: "assets/thumbs/p05.jpg", full: "assets/full/p05.jpg" },
+  "出品标准/868043b2e8fb161d63a07105b8b86a67.jpg": { thumbnail: "assets/thumbs/p06.jpg", full: "assets/full/p06.jpg" },
+  "出品标准/9252bc01fc50b091b045309c336dd755.jpg": { thumbnail: "assets/thumbs/p07.jpg", full: "assets/full/p07.jpg" },
+  "出品标准/982a02a879c79503f35b969bacb5c07a.jpg": { thumbnail: "assets/thumbs/p08.jpg", full: "assets/full/p08.jpg" },
+  "出品标准/109b37c7665b8965e301340589090386.jpg": { thumbnail: "assets/thumbs/p09.jpg", full: "assets/full/p09.jpg" },
+  "出品标准/苏打系列出品标准1.jpg": { thumbnail: "assets/thumbs/p10.jpg", full: "assets/full/p10.jpg" },
+  "出品标准/b6e94191916ccdb2ac60bb4e20fe775c.jpg": { thumbnail: "assets/thumbs/p11.jpg", full: "assets/full/p11.jpg" },
+  "出品标准/e401e2e5ad3e383dcfbc2b7b33f9f3ea.jpg": { thumbnail: "assets/thumbs/p12.jpg", full: "assets/full/p12.jpg" },
+  "出品标准/巴斯克打包.jpg": { thumbnail: "assets/thumbs/p13.jpg", full: "assets/full/p13.jpg" },
+  "日常整洁标准/晚班+交接班.jpg": { thumbnail: "assets/thumbs/c01.jpg", full: "assets/full/c01.jpg" },
+  "日常整洁标准/晚班+交接班2.jpg": { thumbnail: "assets/thumbs/c02.jpg", full: "assets/full/c02.jpg" },
+  "日常整洁标准/晚班+交接班3.jpg": { thumbnail: "assets/thumbs/c03.jpg", full: "assets/full/c03.jpg" },
+  "日常整洁标准/晚班1.jpg": { thumbnail: "assets/thumbs/c04.jpg", full: "assets/full/c04.jpg" },
+  "日常整洁标准/晚班2.jpg": { thumbnail: "assets/thumbs/c05.jpg", full: "assets/full/c05.jpg" },
+  "日常整洁标准/晚班3.jpg": { thumbnail: "assets/thumbs/c06.jpg", full: "assets/full/c06.jpg" },
+  "日常整洁标准/晚班4.jpg": { thumbnail: "assets/thumbs/c07.jpg", full: "assets/full/c07.jpg" },
+  "日常整洁标准/晚班5.jpg": { thumbnail: "assets/thumbs/c08.jpg", full: "assets/full/c08.jpg" }
+};

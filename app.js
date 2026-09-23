@@ -25,6 +25,7 @@
   ];
   let client = null, profile = null, items = [], currentModule = "dashboard", editMode = false, preview = false, editorPreviewUrl = "";
   const standardImageUrls = new Map();
+  const standardPreloads = [];
 
   const configured = () => {
     const c = window.APP_CONFIG || {};
@@ -57,7 +58,7 @@
   }
   function registerServiceWorker() {
     if(!("serviceWorker" in navigator)||location.protocol!=="https:")return;
-    navigator.serviceWorker.register("./sw.js?v=7",{updateViaCache:"none"})
+    navigator.serviceWorker.register("./sw.js?v=9",{updateViaCache:"none"})
       .then((registration)=>registration.update())
       .catch((error)=>console.warn("静态资源缓存启用失败",error));
   }
@@ -131,6 +132,24 @@
     $("#adminNav").classList.toggle("hidden",!isAdmin());
     $$(".admin-only").forEach((x)=>x.classList.toggle("hidden",!isAdmin()));
     navigate("dashboard");
+    preloadStandardThumbnails();
+  }
+  function preloadStandardThumbnails() {
+    if(navigator.connection&&navigator.connection.saveData)return;
+    const start=()=>{
+      Object.values(window.STANDARD_IMAGE_ASSETS||{}).forEach((asset,index)=>{
+        setTimeout(()=>{
+          const image=new Image();
+          image.decoding="async";
+          image.fetchPriority="low";
+          image.onload=()=>standardPreloads.splice(standardPreloads.indexOf(image),1);
+          image.onerror=()=>{standardPreloads.splice(standardPreloads.indexOf(image),1);console.warn(`缩略图预加载失败：${asset.thumbnail}`);};
+          standardPreloads.push(image);
+          image.src=asset.thumbnail;
+        },index*70);
+      });
+    };
+    if("requestIdleCallback" in window)requestIdleCallback(start,{timeout:1800});else setTimeout(start,900);
   }
   function showAuth(){profile=null;items=[];preview=false;$("#appView").classList.add("hidden");$("#authView").classList.remove("hidden");$("#loginBtn").disabled=false;$("#loginBtn").innerHTML="安全登录 <span>→</span>";}
   function navigate(m) {
@@ -249,6 +268,8 @@
     const storagePath=storageVariantPath(src,variant);
     if(storagePath)return standardImageUrls.get(storagePath)||"";
     const path=String(src||"").replace(/\\/g,"/");
+    const mapped=window.STANDARD_IMAGE_ASSETS&&window.STANDARD_IMAGE_ASSETS[path];
+    if(mapped)return variant==="thumbnails"?mapped.thumbnail:mapped.full;
     if(!path||path.startsWith("assets/")||/^(?:https?:|data:|blob:)/i.test(path)||!/\.(?:jpe?g)$/i.test(path))return path;
     return `assets/${variant}/${path}`;
   }
@@ -438,7 +459,23 @@
       $("#saveBtn").disabled=false;$("#saveBtn").textContent="保存内容";
     }
   }
-  function showImage(src,title,previewSrc=""){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";const full=encodeURI(standardImageAsset(src,"images")),mobilePreview=matchMedia("(max-width: 820px)").matches&&previewSrc?previewSrc:"",source=mobilePreview||full,fallback=source!==full?` data-fallback-src="${escapeHtml(full)}"`:storagePathOf(src)?"":` data-fallback-src="${escapeHtml(encodeURI(src))}"`;$("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(source)}"${fallback} alt="${escapeHtml(title)}" decoding="async">`;const image=$("#detailContent img");image.addEventListener("error",()=>useFallbackImage(image));$("#detailDialog").showModal();}
+  function showImage(src,title,previewSrc=""){
+    $("#detailCategory").textContent="图片标准";
+    $("#detailTitle").textContent=title;
+    $("#detailMeta").textContent="点击页面空白处或右上角关闭";
+    const full=encodeURI(standardImageAsset(src,"images")),source=previewSrc||full;
+    const fallback=source!==full?` data-fallback-src="${escapeHtml(full)}"`:storagePathOf(src)?"":` data-fallback-src="${escapeHtml(encodeURI(src))}"`;
+    $("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(source)}"${fallback} alt="${escapeHtml(title)}" decoding="async">`;
+    const image=$("#detailContent img");
+    image.addEventListener("error",()=>useFallbackImage(image));
+    $("#detailDialog").showModal();
+    if(previewSrc&&full&&previewSrc!==full&&!matchMedia("(max-width: 820px)").matches){
+      const highResolution=new Image();
+      highResolution.onload=()=>{if($("#detailDialog").open)image.src=full;};
+      highResolution.onerror=()=>console.warn(`高清图片加载失败：${full}`);
+      highResolution.src=full;
+    }
+  }
   async function mutateUpdate(x,patch,label){const {error}=await client.from("content_items").update({...patch,updated_at:new Date().toISOString()}).eq("id",x.id);if(error)return toast("操作失败："+error.message);await log("update",`${label}：${x.title}`);toast("操作成功");await loadItems();}
   async function mutateDelete(x){
     const {error}=await client.from("content_items").delete().eq("id",x.id);
