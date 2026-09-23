@@ -57,7 +57,9 @@
   }
   function registerServiceWorker() {
     if(!("serviceWorker" in navigator)||location.protocol!=="https:")return;
-    navigator.serviceWorker.register("./sw.js").catch((error)=>console.warn("静态资源缓存启用失败",error));
+    navigator.serviceWorker.register("./sw.js?v=7",{updateViaCache:"none"})
+      .then((registration)=>registration.update())
+      .catch((error)=>console.warn("静态资源缓存启用失败",error));
   }
   function bind() {
     $("#loginForm").addEventListener("submit", login);

@@ -1,17 +1,21 @@
-const CACHE_NAME = "energy-coffee-shell-20260923-6";
+const CACHE_NAME = "energy-coffee-shell-20260923-7";
 const APP_SHELL = [
   "./index.html",
-  "./styles.css",
-  "./vendor/supabase-2.117.1.min.js",
-  "./config.js",
-  "./standards-data.js",
-  "./app.js",
+  "./styles.css?v=7",
+  "./vendor/supabase-2.117.1.min.js?v=7",
+  "./config.js?v=7",
+  "./standards-data.js?v=7",
+  "./app.js?v=7",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => Promise.allSettled(APP_SHELL.map((asset) => cache.add(asset))))
+      .then((cache) => Promise.allSettled(APP_SHELL.map(async (asset) => {
+        const response = await fetch(new Request(asset,{cache:"reload"}));
+        if (!response.ok) throw new Error(`${asset} 返回 ${response.status}`);
+        await cache.put(asset,response);
+      })))
       .then((results) => {
         const failed = results.filter((result) => result.status === "rejected");
         if (failed.length) console.warn(`有 ${failed.length} 个静态资源将在后续访问时重试缓存`);
