@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#00622F">
+  <title>能咖空间 · 培训管理中心</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <main id="authView" class="auth-shell">
+    <section class="brand-panel">
+      <div class="brand-mark">能</div>
+      <p class="eyebrow">ENERGY COFFEE · TEAM SPACE</p>
+      <h1>让每一次出品，<br>都有标准可循。</h1>
+      <p class="brand-copy">门店公告、饮品配方与培训资料，在一个清晰、专注的空间里沉淀。</p>
+      <div class="brand-stats"><span><b>01</b>统一知识库</span><span><b>02</b>标准化培训</span><span><b>03</b>持续成长</span></div>
+    </section>
+    <section class="login-panel">
+      <form id="loginForm" class="login-card">
+        <div class="cup-icon">☕</div>
+        <p class="eyebrow">欢迎回来</p>
+        <h2>登录培训管理中心</h2>
+        <p class="muted">使用门店分配的账号继续</p>
+        <label>账号<input id="email" type="text" autocomplete="username" placeholder="请输入员工或管理员账号" required></label>
+        <label>密码<input id="password" type="password" autocomplete="current-password" placeholder="请输入密码" required></label>
+        <button id="loginBtn" class="primary wide" type="submit">安全登录 <span>→</span></button>
+        <p id="loginError" class="form-error" role="alert"></p>
+        <p class="privacy">仅限内部员工使用 · 账号问题请联系管理员</p>
+      </form>
+      <div id="configGuide" class="config-guide hidden">
+        <span class="guide-icon">⚙</span><div><b>需要连接 Supabase</b><p>请先设置 <code>window.APP_CONFIG.supabaseUrl</code> 与 <code>supabaseAnonKey</code>，随后刷新页面。下方可浏览培训资料示例。</p></div>
+        <button id="previewBtn" class="secondary">进入预览</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="appView" class="app-shell hidden">
+    <div id="mobileOverlay" class="mobile-overlay"></div>
+    <aside id="sidebar" class="sidebar">
+      <div class="side-brand"><div class="brand-mark small">能</div><div><b>能咖空间</b><small>培训管理中心</small></div><button id="closeNav" aria-label="关闭菜单">×</button></div>
+      <nav id="navList">
+        <button class="nav-item active" data-module="dashboard"><span>⌂</span>总览</button>
+        <p class="nav-label">内容中心</p>
+        <button class="nav-item" data-module="announcements"><span>◉</span>首页公告</button>
+        <button class="nav-item" data-module="recipes"><span>♨</span>饮品配方</button>
+        <button class="nav-item" data-module="presentation"><span>◎</span>出品标准</button>
+        <button class="nav-item" data-module="cleanliness"><span>✦</span>日常整洁标准</button>
+        <button class="nav-item" data-module="activities"><span>◇</span>活动档案</button>
+        <button class="nav-item" data-module="training"><span>▤</span>培训资料</button>
+        <div id="adminNav" class="hidden"><p class="nav-label">管理</p><button class="nav-item" data-module="settings"><span>⚙</span>系统设置</button></div>
+      </nav>
+      <div class="side-tip"><span>✦</span><div><b>每日小贴士</b><p>好咖啡来自每一个被认真对待的细节。</p></div></div>
+      <div class="user-card"><div id="userAvatar" class="avatar">员</div><div><b id="userName">门店员工</b><small id="userRole">员工</small></div><button id="logoutBtn" title="退出登录">↪</button></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button id="menuBtn" class="icon-btn menu-btn" aria-label="打开菜单">☰</button>
+        <div><p class="eyebrow" id="dateText"></p><h2 id="pageTitle">工作总览</h2></div>
+        <div class="top-actions">
+          <label class="search-box content-filter"><span>⌕</span><input id="searchInput" type="search" placeholder="搜索标题、内容或分类"></label>
+          <select id="categoryFilter" class="content-filter" aria-label="分类筛选"><option value="">全部分类</option></select>
+          <select id="archiveFilter" class="admin-only hidden" aria-label="状态筛选"><option value="active">使用中</option><option value="archived">已归档</option><option value="all">全部状态</option></select>
+          <button id="editToggle" class="secondary admin-only hidden">编辑模式</button>
+          <button id="addBtn" class="primary admin-only hidden">＋ 添加内容</button>
+        </div>
+      </header>
+      <section id="contentArea" class="content-area" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <dialog id="editorDialog">
+    <form id="editorForm">
+      <div class="dialog-head"><div><p class="eyebrow">内容管理</p><h2 id="dialogTitle">添加内容</h2></div><button id="editorClose" class="icon-btn" type="button" aria-label="关闭内容管理">×</button></div>
+      <input id="itemId" type="hidden">
+      <div class="form-grid">
+        <label>所属模块<select id="itemModule" required></select></label>
+        <label id="itemCategoryField">分类
+          <input id="itemCategory" placeholder="例如：服务培训">
+          <select id="itemCategorySelect" class="hidden" aria-label="饮品分类">
+            <option value="经典咖啡">经典咖啡（经典拿铁等）</option>
+            <option value="风味咖啡">风味咖啡（风味拿铁等）</option>
+            <option value="奶茶">奶茶</option>
+            <option value="柠檬茶类">柠檬茶类</option>
+            <option value="苏打特饮">苏打特饮</option>
+            <option value="茶">茶</option>
+            <option value="茶汤原料">茶汤原料</option>
+          </select>
+        </label>
+        <label class="full"><span id="itemTitleLabel">标题</span><input id="itemTitle" maxlength="100" required placeholder="输入清晰的内容标题"></label>
+        <label id="itemSummaryField" class="full"><span id="itemSummaryLabel">摘要</span><textarea id="itemSummary" rows="2" placeholder="用于列表概览的简短说明"></textarea></label>
+        <label class="full"><span id="itemContentLabel">正文</span><textarea id="itemContent" rows="9" required placeholder="输入正文，可使用换行组织内容"></textarea></label>
+        <label>发布日期<input id="itemPublished" type="datetime-local"></label>
+        <div class="check-row"><label><input id="itemPinned" type="checkbox"> 置顶展示</label><label><input id="itemArchived" type="checkbox"> 归档</label></div>
+      </div>
+      <div class="dialog-actions"><button id="editorCancel" class="secondary" type="button">取消</button><button id="saveBtn" class="primary" type="submit">保存内容</button></div>
+    </form>
+  </dialog>
+  <dialog id="detailDialog"><article><div class="dialog-head"><div><span id="detailCategory" class="tag"></span><h2 id="detailTitle"></h2></div><button class="icon-btn" onclick="this.closest('dialog').close()">×</button></div><p id="detailMeta" class="muted"></p><div id="detailContent" class="detail-content"></div></article></dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js" onerror="void 0"></script>
+  <script src="standards-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
