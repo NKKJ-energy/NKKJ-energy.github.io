@@ -33,6 +33,7 @@
   async function boot() {
     $("#dateText").textContent = new Intl.DateTimeFormat("zh-CN",{month:"long",day:"numeric",weekday:"long"}).format(new Date());
     bind();
+    registerServiceWorker();
     if (!configured()) {
       $("#configGuide").classList.remove("hidden");
       $("#loginForm").querySelectorAll("input,button").forEach((x)=>x.disabled=true);
@@ -42,6 +43,10 @@
     const {data:{session}} = await client.auth.getSession();
     if (session) await enter(session.user);
     client.auth.onAuthStateChange((event, session) => { if (event === "SIGNED_OUT" || !session) showAuth(); });
+  }
+  function registerServiceWorker() {
+    if(!("serviceWorker" in navigator)||location.protocol!=="https:")return;
+    navigator.serviceWorker.register("./sw.js").catch((error)=>console.warn("静态资源缓存启用失败",error));
   }
   function bind() {
     $("#loginForm").addEventListener("submit", login);
