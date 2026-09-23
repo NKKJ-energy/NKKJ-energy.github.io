@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#00622F">
   <title>能咖空间 · 培训管理中心</title>
+  <link rel="preconnect" href="https://udhykgvdozamygbsexwa.supabase.co" crossorigin>
+  <link rel="preload" href="vendor/supabase-2.117.1.min.js" as="script">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -101,9 +103,9 @@
   </dialog>
   <dialog id="detailDialog"><article><div class="dialog-head"><div><span id="detailCategory" class="tag"></span><h2 id="detailTitle"></h2></div><button class="icon-btn" onclick="this.closest('dialog').close()">×</button></div><p id="detailMeta" class="muted"></p><div id="detailContent" class="detail-content"></div></article></dialog>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js" onerror="void 0"></script>
-  <script src="standards-data.js"></script>
-  <script src="app.js"></script>
+  <script defer src="vendor/supabase-2.117.1.min.js"></script>
+  <script defer src="config.js" onerror="void 0"></script>
+  <script defer src="standards-data.js"></script>
+  <script defer src="app.js"></script>
 </body>
 </html>

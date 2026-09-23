@@ -62,6 +62,9 @@
     $("#contentArea").addEventListener("load", (e) => {
       if(e.target.matches && e.target.matches(".standard-image img")) classifyStandardImage(e.target);
     }, true);
+    $("#contentArea").addEventListener("error", (e) => {
+      if(e.target.matches && e.target.matches(".standard-image img")) useFallbackImage(e.target);
+    }, true);
     $("#menuBtn").addEventListener("click", openNav);
     $("#closeNav").addEventListener("click", closeNav);
     $("#mobileOverlay").addEventListener("click", closeNav);
@@ -76,17 +79,26 @@
     await enter(data.user);
   }
   async function enter(user) {
-    const {data,error}=await client.from("profiles").select("*").eq("id",user.id).single();
-    if(error || !data){ await client.auth.signOut(); $("#loginError").textContent="未找到员工资料，请联系管理员完善 profiles 记录。"; return; }
-    profile=data; await loadItems(); showApp();
+    const [profileResult,itemResult]=await Promise.all([
+      client.from("profiles").select("*").eq("id",user.id).single(),
+      itemsQuery()
+    ]);
+    if(profileResult.error || !profileResult.data){ await client.auth.signOut(); $("#loginError").textContent="未找到员工资料，请联系管理员完善 profiles 记录。"; return; }
+    profile=profileResult.data;
+    items=itemResult.data||[];
+    showApp();
+    if(itemResult.error) $("#contentArea").innerHTML=state("!","内容加载失败",escapeHtml(itemResult.error.message));
+  }
+  function itemsQuery() {
+    let q=client.from("content_items").select("*").order("published_at",{ascending:false});
+    const a=$("#archiveFilter").value;
+    if(a==="active") q=q.eq("is_archived",false); else if(a==="archived") q=q.eq("is_archived",true);
+    return q;
   }
   async function loadItems() {
     if(preview) return render();
     $("#contentArea").innerHTML=state("loader","正在读取资料","请稍候");
-    let q=client.from("content_items").select("*").order("published_at",{ascending:false});
-    const a=$("#archiveFilter").value;
-    if(a==="active") q=q.eq("is_archived",false); else if(a==="archived") q=q.eq("is_archived",true);
-    const {data,error}=await q;
+    const {data,error}=await itemsQuery();
     if(error){$("#contentArea").innerHTML=state("!","内容加载失败",escapeHtml(error.message)); return}
     items=data||[]; render();
   }
@@ -174,11 +186,22 @@
     })).filter(section=>section.items.length):staticSections;
     const label=module==="presentation"?"SERVICE STANDARD":"CLEAN & READY";
     $("#contentArea").innerHTML=`<div class="section-head standards-heading"><div><span class="section-kicker">${label}</span><h3>${modules[module][0]}</h3><p>${modules[module][1]}</p></div></div>`+
-      sections.map((section,index)=>`<section class="visual-standard-section"><header><div><span>${String(index+1).padStart(2,"0")}</span><h3>${escapeHtml(section.title)}</h3></div><p>${escapeHtml(section.description)}</p></header><div class="standard-gallery">${section.items.map((item,itemIndex)=>`<article class="standard-item" style="--delay:${itemIndex*35}ms"><button class="standard-image" type="button" data-image="${escapeHtml(item.image)}" aria-label="查看${escapeHtml(item.title)}大图"><img src="${encodeURI(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy"></button><div><span>STANDARD ${String(itemIndex+1).padStart(2,"0")}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.text)}</p>${item.record&&isAdmin()&&editMode?adminActions(item.record,false):""}</div></article>`).join("")}</div></section>`).join("");
+      sections.map((section,index)=>`<section class="visual-standard-section"><header><div><span>${String(index+1).padStart(2,"0")}</span><h3>${escapeHtml(section.title)}</h3></div><p>${escapeHtml(section.description)}</p></header><div class="standard-gallery">${section.items.map((item,itemIndex)=>`<article class="standard-item" style="--delay:${itemIndex*35}ms"><button class="standard-image" type="button" data-image="${escapeHtml(item.image)}" aria-label="查看${escapeHtml(item.title)}大图"><img src="${escapeHtml(encodeURI(optimizedStandardImage(item.image)))}" data-fallback-src="${escapeHtml(encodeURI(item.image))}" alt="${escapeHtml(item.title)}" loading="lazy" decoding="async"></button><div><span>STANDARD ${String(itemIndex+1).padStart(2,"0")}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.text)}</p>${item.record&&isAdmin()&&editMode?adminActions(item.record,false):""}</div></article>`).join("")}</div></section>`).join("");
     $$(".standard-image img",$("#contentArea")).forEach((image)=>{if(image.complete)classifyStandardImage(image);});
   }
   function standardModuleOf(item){return item.metadata&&item.metadata.standard_module;}
   function isStandardItem(item){return standardModules.includes(standardModuleOf(item));}
+  function optimizedStandardImage(src) {
+    const path=String(src||"").replace(/\\/g,"/");
+    if(!path||path.startsWith("assets/images/")||/^(?:https?:|data:|blob:)/i.test(path)||!/\.(?:jpe?g)$/i.test(path))return path;
+    return `assets/images/${path}`;
+  }
+  function useFallbackImage(image) {
+    const fallback=image.dataset.fallbackSrc;
+    if(!fallback||image.getAttribute("src")===fallback)return;
+    image.removeAttribute("data-fallback-src");
+    image.src=fallback;
+  }
   function classifyStandardImage(image) {
     const card=image.closest(".standard-item");
     if(!card||!image.naturalWidth)return;
@@ -263,7 +286,7 @@
     $("#saveBtn").disabled=false;$("#saveBtn").textContent="保存内容"; if(result.error)return toast("保存失败："+result.error.message);
     $("#editorDialog").close();await log(id?"update":"create",payload.title);toast("内容已保存");await loadItems();
   }
-  function showImage(src,title){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";$("#detailContent").innerHTML=`<img class="detail-image" src="${encodeURI(src)}" alt="${escapeHtml(title)}">`;$("#detailDialog").showModal();}
+  function showImage(src,title){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";$("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(encodeURI(optimizedStandardImage(src)))}" data-fallback-src="${escapeHtml(encodeURI(src))}" alt="${escapeHtml(title)}" decoding="async">`;const image=$("#detailContent img");image.addEventListener("error",()=>useFallbackImage(image));$("#detailDialog").showModal();}
   async function mutateUpdate(x,patch,label){const {error}=await client.from("content_items").update({...patch,updated_at:new Date().toISOString()}).eq("id",x.id);if(error)return toast("操作失败："+error.message);await log("update",`${label}：${x.title}`);toast("操作成功");await loadItems();}
   async function mutateDelete(x){const {error}=await client.from("content_items").delete().eq("id",x.id);if(error)return toast("删除失败："+error.message);await log("delete",x.title);toast("内容已删除");await loadItems();}
   async function log(action,detail){if(!client||preview)return;try{await client.from("activity_logs").insert({user_id:profile.id,action,details:{detail}})}catch(_){}}
