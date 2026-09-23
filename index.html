@@ -91,9 +91,22 @@
             <option value="茶">茶</option>
             <option value="茶汤原料">茶汤原料</option>
           </select>
+          <select id="itemStandardCategorySelect" class="hidden" aria-label="标准所属分区"></select>
         </label>
         <label class="full"><span id="itemTitleLabel">标题</span><input id="itemTitle" maxlength="100" required placeholder="输入清晰的内容标题"></label>
-        <label id="itemSummaryField" class="full"><span id="itemSummaryLabel">摘要</span><textarea id="itemSummary" rows="2" placeholder="用于列表概览的简短说明"></textarea></label>
+        <div id="itemSummaryField" class="full editor-field">
+          <label id="itemSummaryLabel" for="itemSummary">摘要</label>
+          <textarea id="itemSummary" rows="2" placeholder="用于列表概览的简短说明"></textarea>
+          <div id="itemImageUpload" class="image-upload-control hidden">
+            <input id="itemImageFile" class="hidden" type="file" accept="image/jpeg,image/png,image/webp">
+            <button id="itemImagePicker" class="image-upload-picker" type="button">
+              <img id="itemImagePreview" class="hidden" alt="待上传图片预览">
+              <span class="image-upload-plus">＋</span>
+              <span id="itemImageUploadText">点击选择图片</span>
+            </button>
+            <small id="itemImageUploadHint">支持 JPG、PNG、WebP，保存时自动压缩上传</small>
+          </div>
+        </div>
         <label class="full"><span id="itemContentLabel">正文</span><textarea id="itemContent" rows="9" required placeholder="输入正文，可使用换行组织内容"></textarea></label>
         <label>发布日期<input id="itemPublished" type="datetime-local"></label>
         <div class="check-row"><label><input id="itemPinned" type="checkbox"> 置顶展示</label><label><input id="itemArchived" type="checkbox"> 归档</label></div>

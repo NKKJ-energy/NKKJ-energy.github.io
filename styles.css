@@ -289,6 +289,40 @@ dialog form, dialog article { padding: 30px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 17px; }
 .form-grid .full { grid-column: 1/-1; }
 .form-grid textarea { resize: vertical; }
+.editor-field { display: grid; gap: 8px; margin-top: 22px; font-size: 13px; font-weight: 600; }
+.image-upload-control { display: grid; gap: 8px; }
+.image-upload-picker {
+  position: relative;
+  min-height: 150px;
+  padding: 18px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  overflow: hidden;
+  border: 1.5px dashed rgba(0,98,47,.35);
+  border-radius: 14px;
+  color: var(--green);
+  background: rgba(0,98,47,.035);
+  transition: border-color .2s, background .2s, transform .2s;
+}
+.image-upload-picker:hover { border-color: var(--green); background: rgba(0,98,47,.07); }
+.image-upload-picker:active { transform: scale(.995); }
+.image-upload-picker img { width: 100%; max-height: 260px; object-fit: contain; border-radius: 10px; }
+.image-upload-picker img:not(.hidden) ~ .image-upload-plus {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--green);
+  box-shadow: 0 8px 22px rgba(0,98,47,.25);
+}
+.image-upload-plus { font-size: 34px; line-height: 1; font-weight: 400; }
+.image-upload-control small { color: var(--muted); font-weight: 400; }
 .check-row { display: flex; align-items: end; gap: 18px; }
 .check-row label { display: flex; align-items: center; gap: 7px; }
 .check-row input { width: auto; }

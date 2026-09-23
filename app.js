@@ -6,7 +6,7 @@
     dashboard: ["工作总览", "今天也要为一杯好咖啡认真"],
     announcements: ["首页公告", "门店最新通知与重要事项"],
     recipes: ["饮品配方", "稳定复现每一杯好味道"],
-    presentation: ["出品标准", "统一堂食与外带的杯型、摆盘和交付标准"],
+    presentation: ["出品标准", "统一堂食与外卖的杯型、摆盘和交付标准"],
     cleanliness: ["日常整洁标准", "交接班与晚班清洁要求"],
     activities: ["活动档案", "记录门店活动与精彩时刻"],
     training: ["培训资料", "持续学习，和团队一起成长"],
@@ -15,10 +15,16 @@
   const standardModules = ["presentation","cleanliness"];
   const editableModules = Object.keys(modules).filter((x) => !["dashboard","settings"].includes(x));
   const recipeCategoryOrder = ["经典咖啡","风味咖啡","奶茶","柠檬茶类","苏打特饮","茶","茶汤原料"];
+  const standardCategories = {
+    presentation: ["堂食杯","外卖杯"],
+    cleanliness: ["交接班","晚班"]
+  };
+  const storageImagePrefix = "storage:";
   const previewItems = [
     {id:"preview-1",module:"training",title:"开店前准备标准",category:"工作流程",summary:"环境、设备、物料与人员状态的完整检查清单。",content:"一、环境准备\n提前开启照明与空调，确认店内温度舒适；检查桌椅、地面、吧台及洗手间清洁。\n\n二、设备检查\n依次开启净水、咖啡机、磨豆机与制冰机；确认咖啡机压力、温度正常，并完成冲煮头放水。\n\n三、物料准备\n检查咖啡豆、牛奶、糖浆、杯具及外带耗材，严格遵循先进先出原则。",published_at:new Date().toISOString()}
   ];
-  let client = null, profile = null, items = [], currentModule = "dashboard", editMode = false, preview = false;
+  let client = null, profile = null, items = [], currentModule = "dashboard", editMode = false, preview = false, editorPreviewUrl = "";
+  const standardImageUrls = new Map();
 
   const configured = () => {
     const c = window.APP_CONFIG || {};
@@ -39,10 +45,15 @@
       $("#loginForm").querySelectorAll("input,button").forEach((x)=>x.disabled=true);
       return;
     }
-    client = window.supabase.createClient(window.APP_CONFIG.supabaseUrl, window.APP_CONFIG.supabaseAnonKey);
-    const {data:{session}} = await client.auth.getSession();
-    if (session) await enter(session.user);
+    clearPersistedSession();
+    client = window.supabase.createClient(window.APP_CONFIG.supabaseUrl, window.APP_CONFIG.supabaseAnonKey, {
+      auth: {persistSession:false,detectSessionInUrl:false}
+    });
     client.auth.onAuthStateChange((event, session) => { if (event === "SIGNED_OUT" || !session) showAuth(); });
+  }
+  function clearPersistedSession() {
+    const projectRef=new URL(window.APP_CONFIG.supabaseUrl).hostname.split(".")[0];
+    localStorage.removeItem(`sb-${projectRef}-auth-token`);
   }
   function registerServiceWorker() {
     if(!("serviceWorker" in navigator)||location.protocol!=="https:")return;
@@ -60,6 +71,8 @@
     $("#addBtn").addEventListener("click", () => openEditor());
     $("#editorForm").addEventListener("submit", saveItem);
     $("#itemModule").addEventListener("change", () => applyEditorMode($("#itemModule").value));
+    $("#itemImagePicker").addEventListener("click", () => $("#itemImageFile").click());
+    $("#itemImageFile").addEventListener("change", previewSelectedImage);
     $("#editorClose").addEventListener("click", closeEditor);
     $("#editorCancel").addEventListener("click", closeEditor);
     $("#editorDialog").addEventListener("click", (e) => { if(e.target===$("#editorDialog")) closeEditor(); });
@@ -105,7 +118,8 @@
     $("#contentArea").innerHTML=state("loader","正在读取资料","请稍候");
     const {data,error}=await itemsQuery();
     if(error){$("#contentArea").innerHTML=state("!","内容加载失败",escapeHtml(error.message)); return}
-    items=data||[]; render();
+    items=data||[];
+    if(standardModules.includes(currentModule))navigate(currentModule); else render();
   }
   function showApp() {
     $("#authView").classList.add("hidden"); $("#appView").classList.remove("hidden");
@@ -126,7 +140,15 @@
     $("#archiveFilter").classList.toggle("hidden",!isAdmin()||m==="settings");
     $("#editToggle").classList.toggle("hidden",!isAdmin()||m==="settings");
     $("#addBtn").classList.toggle("hidden",!isAdmin()||!editableModules.includes(m));
-    closeNav(); updateCategories(); render();
+    closeNav(); updateCategories();
+    if(staticPage&&unresolvedStorageImagePaths(items).length){
+      $("#contentArea").innerHTML=state("loader","正在读取图片","请稍候");
+      refreshStandardImageUrls(items).then(()=>{if(currentModule===m)render();}).catch((error)=>{
+        if(currentModule===m)$("#contentArea").innerHTML=state("!","图片加载失败",escapeHtml(error.message));
+      });
+      return;
+    }
+    render();
   }
   function filtered() {
     const q=$("#searchInput").value.trim().toLowerCase(), cat=$("#categoryFilter").value;
@@ -183,28 +205,61 @@
   function renderStandards(module) {
     const staticSections=(window.STANDARDS_DATA&&window.STANDARDS_DATA[module])||[];
     const saved=items.filter(x=>standardModuleOf(x)===module).sort((a,b)=>Number(a.metadata&&a.metadata.sort_index)-Number(b.metadata&&b.metadata.sort_index));
-    const sectionNames=[...staticSections.map(x=>x.title),...saved.map(x=>x.category).filter(x=>!staticSections.some(section=>section.title===x))];
+    const sectionNames=[...staticSections.map(x=>x.title),...saved.map(x=>standardCategoryOf(module,x.category)).filter(x=>!staticSections.some(section=>section.title===x))];
     const sections=saved.length?sectionNames.map(title=>({
       title,
       description:(staticSections.find(x=>x.title===title)||{}).description||"由管理员维护的门店标准。",
-      items:saved.filter(x=>x.category===title).map(x=>({id:x.id,image:x.summary,title:x.title,text:x.content,record:x}))
+      items:saved.filter(x=>standardCategoryOf(module,x.category)===title).map(x=>({id:x.id,image:x.summary,title:x.title,text:x.content,record:x}))
     })).filter(section=>section.items.length):staticSections;
     const label=module==="presentation"?"SERVICE STANDARD":"CLEAN & READY";
     $("#contentArea").innerHTML=`<div class="section-head standards-heading"><div><span class="section-kicker">${label}</span><h3>${modules[module][0]}</h3><p>${modules[module][1]}</p></div></div>`+
-      sections.map((section,index)=>`<section class="visual-standard-section"><header><div><span>${String(index+1).padStart(2,"0")}</span><h3>${escapeHtml(section.title)}</h3></div><p>${escapeHtml(section.description)}</p></header><div class="standard-gallery">${section.items.map((item,itemIndex)=>`<article class="standard-item" style="--delay:${itemIndex*35}ms"><button class="standard-image" type="button" data-image="${escapeHtml(item.image)}" aria-label="查看${escapeHtml(item.title)}大图"><img src="${escapeHtml(encodeURI(optimizedStandardImage(item.image)))}" data-fallback-src="${escapeHtml(encodeURI(item.image))}" alt="${escapeHtml(item.title)}" loading="lazy" decoding="async"></button><div><span>STANDARD ${String(itemIndex+1).padStart(2,"0")}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.text)}</p>${item.record&&isAdmin()&&editMode?adminActions(item.record,false):""}</div></article>`).join("")}</div></section>`).join("");
+      sections.map((section,index)=>`<section class="visual-standard-section"><header><div><span>${String(index+1).padStart(2,"0")}</span><h3>${escapeHtml(section.title)}</h3></div><p>${escapeHtml(section.description)}</p></header><div class="standard-gallery">${section.items.map((item,itemIndex)=>`<article class="standard-item" style="--delay:${itemIndex*35}ms"><button class="standard-image" type="button" data-image="${escapeHtml(item.image)}" aria-label="查看${escapeHtml(item.title)}大图">${standardThumbnail(item)}</button><div><span>STANDARD ${String(itemIndex+1).padStart(2,"0")}</span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.text)}</p>${item.record&&isAdmin()&&editMode?adminActions(item.record,false):""}</div></article>`).join("")}</div></section>`).join("");
     $$(".standard-image img",$("#contentArea")).forEach((image)=>{if(image.complete)classifyStandardImage(image);});
   }
   function standardModuleOf(item){return item.metadata&&item.metadata.standard_module;}
   function isStandardItem(item){return standardModules.includes(standardModuleOf(item));}
-  function optimizedStandardImage(src) {
+  function standardCategoryOf(module,category) {
+    return module==="presentation"&&category==="外带杯"?"外卖杯":category;
+  }
+  function storagePathOf(src) {
+    return String(src||"").startsWith(storageImagePrefix)?String(src).slice(storageImagePrefix.length):"";
+  }
+  function storageVariantPath(src,variant) {
+    const path=storagePathOf(src);
+    if(!path)return "";
+    return variant==="thumbnails"?path.replace("/full/","/thumb/"):path;
+  }
+  function unresolvedStorageImagePaths(records) {
+    const paths=records.filter(isStandardItem).flatMap((item)=>[
+      storageVariantPath(item.summary,"images"),
+      storageVariantPath(item.summary,"thumbnails")
+    ]).filter(Boolean);
+    return [...new Set(paths)].filter((path)=>!standardImageUrls.has(path));
+  }
+  async function refreshStandardImageUrls(records) {
+    const paths=unresolvedStorageImagePaths(records);
+    if(!paths.length)return;
+    const {data,error}=await client.storage.from("training-files").createSignedUrls(paths,60*60*8);
+    if(error)throw new Error(`无法读取上传图片：${error.message}`);
+    data.forEach((entry)=>{if(entry.signedUrl)standardImageUrls.set(entry.path,entry.signedUrl);});
+  }
+  function standardImageAsset(src,variant) {
+    const storagePath=storageVariantPath(src,variant);
+    if(storagePath)return standardImageUrls.get(storagePath)||"";
     const path=String(src||"").replace(/\\/g,"/");
-    if(!path||path.startsWith("assets/images/")||/^(?:https?:|data:|blob:)/i.test(path)||!/\.(?:jpe?g)$/i.test(path))return path;
-    return `assets/images/${path}`;
+    if(!path||path.startsWith("assets/")||/^(?:https?:|data:|blob:)/i.test(path)||!/\.(?:jpe?g)$/i.test(path))return path;
+    return `assets/${variant}/${path}`;
+  }
+  function standardThumbnail(item) {
+    const original=encodeURI(item.image),full=encodeURI(standardImageAsset(item.image,"images")),thumbnail=encodeURI(standardImageAsset(item.image,"thumbnails"));
+    const originalFallback=storagePathOf(item.image)?"":` data-original-src="${escapeHtml(original)}"`;
+    return `<img src="${escapeHtml(thumbnail)}" data-fallback-src="${escapeHtml(full)}"${originalFallback} alt="${escapeHtml(item.title)}" loading="lazy" decoding="async">`;
   }
   function useFallbackImage(image) {
-    const fallback=image.dataset.fallbackSrc;
+    const fallback=image.dataset.fallbackSrc||image.dataset.originalSrc;
     if(!fallback||image.getAttribute("src")===fallback)return;
-    image.removeAttribute("data-fallback-src");
+    if(image.dataset.fallbackSrc)image.removeAttribute("data-fallback-src");
+    else image.removeAttribute("data-original-src");
     image.src=fallback;
   }
   function classifyStandardImage(image) {
@@ -259,41 +314,140 @@
     if(preview)return toast("预览模式不可修改内容");
     $("#dialogTitle").textContent=x.id?"编辑内容":"添加内容"; $("#itemId").value=x.id||"";
     $("#itemModule").innerHTML=editableModules.map(m=>`<option value="${m}">${modules[m][0]}</option>`).join("");
-    $("#itemModule").value=standardModuleOf(x)||x.module||(editableModules.includes(currentModule)?currentModule:"announcements");
+    const module=standardModuleOf(x)||x.module||(editableModules.includes(currentModule)?currentModule:"announcements");
+    $("#itemModule").value=module;
     $("#itemCategory").value=x.category||"";$("#itemCategorySelect").value=recipeCategoryOrder.includes(x.category)?x.category:"经典咖啡";$("#itemTitle").value=x.title||"";$("#itemSummary").value=x.summary||"";$("#itemContent").value=x.content||"";
+    $("#itemImageFile").value="";
+    resetEditorImagePreview();
     $("#itemPublished").value=x.published_at?new Date(new Date(x.published_at).getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):"";
-    $("#itemPinned").checked=!!x.is_pinned;$("#itemArchived").checked=!!x.is_archived;applyEditorMode($("#itemModule").value);$("#editorDialog").showModal();
+    $("#itemPinned").checked=!!x.is_pinned;$("#itemArchived").checked=!!x.is_archived;applyEditorMode(module,x.category);
+    if(standardModules.includes(module)&&x.summary)setEditorImagePreview(standardImageAsset(x.summary,"images"),"点击更换图片");
+    $("#editorDialog").showModal();
   }
-  function applyEditorMode(module) {
+  function applyEditorMode(module,selectedCategory="") {
     const recipe=module==="recipes",standard=standardModules.includes(module);
-    $("#itemCategory").classList.toggle("hidden",recipe);
+    $("#itemCategory").classList.toggle("hidden",recipe||standard);
     $("#itemCategorySelect").classList.toggle("hidden",!recipe);
+    $("#itemStandardCategorySelect").classList.toggle("hidden",!standard);
     $("#itemSummaryField").classList.toggle("hidden",recipe);
-    $("#itemSummaryLabel").textContent=standard?"图片路径":"摘要";
-    $("#itemTitleLabel").textContent=recipe?"饮品名称":standard?"标准名称":"标题";
+    $("#itemSummary").classList.toggle("hidden",standard);
+    $("#itemImageUpload").classList.toggle("hidden",!standard);
+    $("#itemSummaryLabel").textContent=standard?"图片上传":"摘要";
+    $("#itemTitleLabel").textContent=recipe?"饮品名称":module==="presentation"?"出品标准名称":module==="cleanliness"?"整洁标准名称":"标题";
     $("#itemContentLabel").textContent=recipe?"配方内容":standard?"标准说明":"正文";
     $("#itemCategoryField").childNodes[0].textContent=standard?"所属分区":"分类";
-    $("#itemTitle").placeholder=recipe?"输入饮品名称":standard?"输入标准名称":"输入清晰的内容标题";
-    $("#itemSummary").placeholder=standard?"输入项目内图片路径，例如：出品标准/图片.jpg":"用于列表概览的简短说明";
+    $("#itemTitle").placeholder=recipe?"输入饮品名称":module==="presentation"?"输入出品标准名称":standard?"输入整洁标准名称":"输入清晰的内容标题";
+    $("#itemSummary").placeholder="用于列表概览的简短说明";
     $("#itemContent").placeholder=recipe?"输入中杯、大杯配方及制作注意事项":standard?"输入图片对应的执行标准":"输入正文，可使用换行组织内容";
     $("#itemPinned").closest("label").classList.toggle("hidden",recipe||standard);
+    if(standard){
+      const categories=standardCategories[module];
+      $("#itemStandardCategorySelect").innerHTML=categories.map((category)=>`<option value="${category}">${category}</option>`).join("");
+      const normalized=standardCategoryOf(module,selectedCategory);
+      $("#itemStandardCategorySelect").value=categories.includes(normalized)?normalized:categories[0];
+    }
     if(recipe||standard) $("#itemPinned").checked=false;
   }
-  function closeEditor(){if($("#editorDialog").open)$("#editorDialog").close();}
+  function resetEditorImagePreview() {
+    if(editorPreviewUrl)URL.revokeObjectURL(editorPreviewUrl);
+    editorPreviewUrl="";
+    $("#itemImagePreview").removeAttribute("src");
+    $("#itemImagePreview").classList.add("hidden");
+    $("#itemImageUploadText").textContent="点击选择图片";
+  }
+  function setEditorImagePreview(src,text) {
+    if(!src)return;
+    $("#itemImagePreview").src=src;
+    $("#itemImagePreview").classList.remove("hidden");
+    $("#itemImageUploadText").textContent=text;
+  }
+  function previewSelectedImage() {
+    const file=$("#itemImageFile").files[0];
+    if(!file)return;
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>10*1024*1024){
+      $("#itemImageFile").value="";
+      toast("请选择 10MB 以内的 JPG、PNG 或 WebP 图片");
+      return;
+    }
+    resetEditorImagePreview();
+    editorPreviewUrl=URL.createObjectURL(file);
+    setEditorImagePreview(editorPreviewUrl,`已选择：${file.name}`);
+  }
+  function closeEditor(){resetEditorImagePreview();if($("#editorDialog").open)$("#editorDialog").close();}
+  async function resizeImage(file,maxSize,quality) {
+    const bitmap=await createImageBitmap(file);
+    const scale=Math.min(1,maxSize/Math.max(bitmap.width,bitmap.height));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+    canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+    canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
+    bitmap.close();
+    const blob=await new Promise((resolve)=>canvas.toBlob(resolve,"image/jpeg",quality));
+    if(!blob)throw new Error("图片压缩失败，请更换图片后重试");
+    return blob;
+  }
+  async function uploadStandardImage(file,module) {
+    const [full,thumbnail]=await Promise.all([resizeImage(file,1200,.74),resizeImage(file,640,.54)]);
+    const id=crypto.randomUUID();
+    const fullPath=`standards/${module}/${id}/full/image.jpg`,thumbnailPath=`standards/${module}/${id}/thumb/image.jpg`;
+    const fullResult=await client.storage.from("training-files").upload(fullPath,full,{contentType:"image/jpeg",cacheControl:"31536000"});
+    if(fullResult.error)throw new Error(`图片上传失败：${fullResult.error.message}`);
+    const thumbnailResult=await client.storage.from("training-files").upload(thumbnailPath,thumbnail,{contentType:"image/jpeg",cacheControl:"31536000"});
+    if(thumbnailResult.error){
+      const cleanup=await client.storage.from("training-files").remove([fullPath]);
+      const suffix=cleanup.error?`；已上传文件清理失败：${cleanup.error.message}`:"";
+      throw new Error(`缩略图上传失败：${thumbnailResult.error.message}${suffix}`);
+    }
+    return {reference:`${storageImagePrefix}${fullPath}`,paths:[fullPath,thumbnailPath]};
+  }
+  function storagePathsForReference(reference) {
+    const fullPath=storageVariantPath(reference,"images");
+    return fullPath?[fullPath,storageVariantPath(reference,"thumbnails")]:[];
+  }
   async function saveItem(e) {
-    e.preventDefault(); const id=$("#itemId").value,module=$("#itemModule").value,recipe=module==="recipes",standard=standardModules.includes(module),existing=id?items.find(i=>String(i.id)===id):null,payload={module:standard?"training":module,category:recipe?$("#itemCategorySelect").value:$("#itemCategory").value.trim(),title:$("#itemTitle").value.trim(),summary:recipe?(existing&&existing.summary||""):$("#itemSummary").value.trim(),content:$("#itemContent").value.trim(),is_pinned:recipe||standard?false:$("#itemPinned").checked,is_archived:$("#itemArchived").checked,published_at:$("#itemPublished").value?new Date($("#itemPublished").value).toISOString():(existing&&existing.published_at)||new Date().toISOString(),updated_at:new Date().toISOString()};
+    e.preventDefault();
+    const id=$("#itemId").value,module=$("#itemModule").value,recipe=module==="recipes",standard=standardModules.includes(module),existing=id?items.find(i=>String(i.id)===id):null,file=$("#itemImageFile").files[0];
+    if(standard&&!file&&!(existing&&existing.summary)){toast("请先上传标准图片");return}
+    const payload={module:standard?"training":module,category:recipe?$("#itemCategorySelect").value:standard?$("#itemStandardCategorySelect").value:$("#itemCategory").value.trim(),title:$("#itemTitle").value.trim(),summary:recipe?(existing&&existing.summary||""):standard?(existing&&existing.summary||""):$("#itemSummary").value.trim(),content:$("#itemContent").value.trim(),is_pinned:recipe||standard?false:$("#itemPinned").checked,is_archived:$("#itemArchived").checked,published_at:$("#itemPublished").value?new Date($("#itemPublished").value).toISOString():(existing&&existing.published_at)||new Date().toISOString(),updated_at:new Date().toISOString()};
     if(!id)payload.created_by=profile.id;
     if(recipe&&!id){const positions=items.filter(x=>x.module==="recipes"&&x.category===payload.category).map(x=>Number(x.metadata&&x.metadata.sort_index)).filter(Number.isFinite);payload.metadata={source:"manual",sort_index:positions.length?Math.max(...positions)+1:0};}
-    if(standard){const sameGroup=existing&&standardModuleOf(existing)===module&&existing.category===payload.category,positions=items.filter(x=>x.id!==(existing&&existing.id)&&standardModuleOf(x)===module&&x.category===payload.category).map(x=>Number(x.metadata&&x.metadata.sort_index)).filter(Number.isFinite);payload.metadata={...(existing&&existing.metadata||{}),standard_module:module,sort_index:sameGroup?(Number(existing.metadata&&existing.metadata.sort_index)||0):(positions.length?Math.max(...positions)+1:0)};}
+    if(standard){const sameGroup=existing&&standardModuleOf(existing)===module&&standardCategoryOf(module,existing.category)===payload.category,positions=items.filter(x=>x.id!==(existing&&existing.id)&&standardModuleOf(x)===module&&standardCategoryOf(module,x.category)===payload.category).map(x=>Number(x.metadata&&x.metadata.sort_index)).filter(Number.isFinite);payload.metadata={...(existing&&existing.metadata||{}),standard_module:module,sort_index:sameGroup?(Number(existing.metadata&&existing.metadata.sort_index)||0):(positions.length?Math.max(...positions)+1:0)};}
     else if(existing&&isStandardItem(existing)){payload.metadata={...(existing.metadata||{})};delete payload.metadata.standard_module;delete payload.metadata.sort_index;}
     $("#saveBtn").disabled=true;$("#saveBtn").textContent="保存中…";
-    const result=id?await client.from("content_items").update(payload).eq("id",id):await client.from("content_items").insert(payload);
-    $("#saveBtn").disabled=false;$("#saveBtn").textContent="保存内容"; if(result.error)return toast("保存失败："+result.error.message);
-    $("#editorDialog").close();await log(id?"update":"create",payload.title);toast("内容已保存");await loadItems();
+    let uploaded=null;
+    try{
+      let cleanupWarning="";
+      if(standard&&file){$("#saveBtn").textContent="正在压缩并上传…";uploaded=await uploadStandardImage(file,module);payload.summary=uploaded.reference;}
+      const result=id?await client.from("content_items").update(payload).eq("id",id):await client.from("content_items").insert(payload);
+      if(result.error)throw new Error(`保存失败：${result.error.message}`);
+      if(uploaded&&existing&&storagePathOf(existing.summary)){
+        const cleanup=await client.storage.from("training-files").remove(storagePathsForReference(existing.summary));
+        if(cleanup.error)cleanupWarning=`内容已保存，但旧图片清理失败：${cleanup.error.message}`;
+      }
+      closeEditor();await log(id?"update":"create",payload.title);toast(cleanupWarning||"内容已保存");await loadItems();
+    }catch(error){
+      let cleanupWarning="";
+      if(uploaded){
+        const cleanup=await client.storage.from("training-files").remove(uploaded.paths);
+        if(cleanup.error)cleanupWarning=`；临时图片清理失败：${cleanup.error.message}`;
+      }
+      toast(`${error.message||"保存失败，请稍后重试"}${cleanupWarning}`);
+    }finally{
+      $("#saveBtn").disabled=false;$("#saveBtn").textContent="保存内容";
+    }
   }
-  function showImage(src,title){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";$("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(encodeURI(optimizedStandardImage(src)))}" data-fallback-src="${escapeHtml(encodeURI(src))}" alt="${escapeHtml(title)}" decoding="async">`;const image=$("#detailContent img");image.addEventListener("error",()=>useFallbackImage(image));$("#detailDialog").showModal();}
+  function showImage(src,title){$("#detailCategory").textContent="图片标准";$("#detailTitle").textContent=title;$("#detailMeta").textContent="点击页面空白处或右上角关闭";const fallback=storagePathOf(src)?"":` data-fallback-src="${escapeHtml(encodeURI(src))}"`;$("#detailContent").innerHTML=`<img class="detail-image" src="${escapeHtml(encodeURI(standardImageAsset(src,"images")))}"${fallback} alt="${escapeHtml(title)}" decoding="async">`;const image=$("#detailContent img");image.addEventListener("error",()=>useFallbackImage(image));$("#detailDialog").showModal();}
   async function mutateUpdate(x,patch,label){const {error}=await client.from("content_items").update({...patch,updated_at:new Date().toISOString()}).eq("id",x.id);if(error)return toast("操作失败："+error.message);await log("update",`${label}：${x.title}`);toast("操作成功");await loadItems();}
-  async function mutateDelete(x){const {error}=await client.from("content_items").delete().eq("id",x.id);if(error)return toast("删除失败："+error.message);await log("delete",x.title);toast("内容已删除");await loadItems();}
+  async function mutateDelete(x){
+    const {error}=await client.from("content_items").delete().eq("id",x.id);
+    if(error)return toast("删除失败："+error.message);
+    let cleanupWarning="";
+    if(storagePathOf(x.summary)){
+      const cleanup=await client.storage.from("training-files").remove(storagePathsForReference(x.summary));
+      if(cleanup.error)cleanupWarning=`内容已删除，但图片清理失败：${cleanup.error.message}`;
+    }
+    await log("delete",x.title);toast(cleanupWarning||"内容已删除");await loadItems();
+  }
   async function log(action,detail){if(!client||preview)return;try{await client.from("activity_logs").insert({user_id:profile.id,action,details:{detail}})}catch(_){}}
   function openNav(){$("#sidebar").classList.add("open");$("#mobileOverlay").classList.add("show")}
   function closeNav(){$("#sidebar").classList.remove("open");$("#mobileOverlay").classList.remove("show")}
