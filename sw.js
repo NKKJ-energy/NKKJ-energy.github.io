@@ -1,4 +1,4 @@
-const CACHE_NAME = "energy-coffee-shell-20260923-1";
+const CACHE_NAME = "energy-coffee-shell-20260923-2";
 const APP_SHELL = [
   "./index.html",
   "./styles.css",
@@ -11,7 +11,11 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => Promise.allSettled(APP_SHELL.map((asset) => cache.add(asset))))
+      .then((results) => {
+        const failed = results.filter((result) => result.status === "rejected");
+        if (failed.length) console.warn(`有 ${failed.length} 个静态资源将在后续访问时重试缓存`);
+      })
       .then(() => self.skipWaiting())
   );
 });
